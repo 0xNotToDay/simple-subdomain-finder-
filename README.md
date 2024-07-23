@@ -1,7 +1,7 @@
 simple tool for find subdomains 
 
 to install 
-'get clone '
+'''get clone https://github.com/0xNotToDay/simple-subdomain-finder-.git'''
 
 use:
-'subdomain -d google.com'
+'''subdomain -d google.com'''
