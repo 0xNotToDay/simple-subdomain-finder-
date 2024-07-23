@@ -1,0 +1,48 @@
+#!/bin/bash 
+
+if [[ -z $1 ]]; then echo '
+to use subdoamin -h' ; fi
+while getopts ":dhnd" op; do
+   case $op in
+      d) 
+           curl -s "https://otx.alienvault.com/api/v1/indicators/domain/$2/passive_dns"| jq -r ".passive_dns[].hostname"| sort -u > tmp.txt &
+           curl -s "https://jldc.me/anubis/subdomains/$2" | jq -r '.' | cut -d '"' -f2 | cut -d '[' -f1 | cut -d ']' -f1 | grep . | sort -u >> tmp.txt &
+           curl -s "http://web.archive.org/cdx/search/cdx?url=*.$2/*&output=text&fl=original&collapse=urlkey" | sort | sed -e 's_https*://__' -e "s/\/.*//" -e 's/:.*//' -e 's/^www\.//' | sort -u >> tmp.txt &
+           curl -s "https://certspotter.com/api/v0/certs?domain=$2" | jq '.[].dns_names[]' 2> /dev/null | sed 's/\"//g' | sed 's/\*\.//g' | grep -w $2\$ | sort -u >> tmp.txt &
+           curl -s "https://crt.sh/?q=%.$2&output=json" | jq -r '.[].name_value' | sed 's/\*\.//g' | sort -u >> tmp.txt &
+           curl -s "https://dns.bufferover.run/dns?q=.$2" | jq -r .FDNS_A[] 2>/dev/null | cut -d ',' -f2 | grep -o "\w.*$2" | sort -u >> tmp.txt &
+           curl -s "https://dns.bufferover.run/dns?q=.$2" | jq -r .RDNS[] 2>/dev/null | cut -d ',' -f2 | grep -o "\w.*$2" | sort -u >> tmp.txt &
+           curl -s "https://tls.bufferover.run/dns?q=.$2" | jq -r .Results 2>/dev/null | cut -d ',' -f3 | grep -o "\w.*$2"| sort -u >> tmp.txt &
+           curl -s "https://api.hackertarget.com/hostsearch/?q=$2" | cut -d ',' -f1 | sort -u >> tmp.txt &
+           curl -s "https://rapiddns.io/subdomain/$2?full=1#result" | grep -oaEi "https?://[^\"\\'> ]+" | grep $2 | sed 's/https\?:\/\///' | cut -d "/" -f3 | sort -u >> tmp.txt &
+           curl -s "https://riddler.io/search/exportcsv?q=pld:$2" | grep -o "\w.*$2" | cut -d ',' -f6 | sort -u >> tmp.txt &
+           curl -s "https://www.threatcrowd.org/searchApi/v2/domain/report/?domain=$2" | jq '.subdomains' | cut -d '"' -f2 | cut -d '[' -f1 | cut -d ']' -f1 | grep . | sort -u >> tmp.txt &
+           curl -s "https://api.threatminer.org/v2/domain.php?q=$21&rt=5" | jq -r '.results[]' | sort -u >> tmp.txt &
+           curl -s "https://urlscan.io/api/v1/search/?q=domain:$2" | jq -r '.results[].page.domain' | sort -u >> tmp.txt &
+           curl -s "https://www.virustotal.com/ui/domains/$2/subdomains?limit=40" | grep '"id":' | cut -d '"' -f4 | sort -u >> tmp.txt &
+           csrftoken=$(curl -ILs https://dnsdumpster.com | grep csrftoken | cut -d " " -f2 | cut -d "=" -f2 | tr -d ";")
+           curl -s --header "Host:dnsdumpster.com" --referer https://dnsdumpster.com --user-agent "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:45.0) Gecko/20100101 Firefox/45.0" --data "csrfmiddlewaretoken=$csrftoken&targetip=$2" --cookie "csrftoken=$csrftoken; _ga=GA1.2.1737013576.1458811829; _gat=1" https://dnsdumpster.com >> dnsdumpster.html
+           if [[ -e $2 && -s $2 ]]; then # file exists and is not zero size
+                  cat dnsdumpster.html | grep "https://api.hackertarget.com/httpheaders" | grep -o "\w.*$2" | cut -d "/" -f7 | grep '.' | sort -u >> tmp.txt
+                  fi
+           cat tmp.txt | grep -iv "*" | sort -u | grep $2 | tee
+           rm -rf dnsdumpster.html
+           rm -rf tmp.txt
+           ;;
+      h)
+           echo -e "
+           
+
+            subdomin  tool "
+           echo -e "
+:[Usage]:
+      -d | to subdomain Finder || -d DOMAIN
+      
+           
+           "
+           ;;
+      \?) 
+          echo -e "Invalid option use subdomin -h "
+  esac  
+done
+
